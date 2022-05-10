@@ -152,8 +152,8 @@ typedef struct tSnifferState {
     bool jamming;
     bool hijacking;
     bool hijacked;
-    CustomTicker hj_ticker;
-    CustomTicker ble5_ticker;
+    CustomTimer hj_ticker;
+    CustomTimer ble5_ticker;
     int16_t hj_timer;
     uint16_t hj_tries;
     bool send_pkt;
@@ -166,7 +166,7 @@ typedef struct tSnifferState {
 
     bool measuring;
     bool synced;
-    CustomTicker ticker;
+    CustomTimer ticker;
     ISequenceGenerator *sg;
 } sniffer_state_t;
 
