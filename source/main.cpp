@@ -250,7 +250,7 @@ void hop_tick()
 void next_adv_channel(void)
 {
   g_sniffer.ticker.detach();
-  pLink->verbose(B("*"));
+  //pLink->verbose(B("*"));
 
   if ((g_sniffer.channel >= 37) && (g_sniffer.channel <39))
   {
@@ -320,7 +320,6 @@ void hj_sync()
 
 static void next_channel_tick()
 {
-  pLink->verbose(B("next_channel_tick()"));
   /* TODO: maybe use the same code as sync_hop_channel, I mean listen on a channel
   a bit earlier and wait for master's packet to synchronize rather than relying
   on microbit's timers... */
@@ -1025,8 +1024,7 @@ extern "C" void RADIO_IRQHandler(void)
                 }
 
                 /* Forward packets to link. */
-                //if (rx_buffer[1] > 0)
-                if (1)
+                if (rx_buffer[1] > 0)
                 {
                   /* Is it a LL_CONNECTION_UPDATE_REQ ? */
                   if (((rx_buffer[0]&0x03) == 0x03) && (rx_buffer[2] == 0x00))
@@ -1789,8 +1787,9 @@ static void sync_hop_channel(void)
 {
   uint8_t hexbuf[20];
   uint8_t dbg[128];
-  snprintf((char *)dbg, 128, "sync_hop_channel() %d", g_sniffer.channel);
-  pLink->verbose(dbg);
+  
+  //snprintf((char *)dbg, 128, "sync_hop_channel() %d", g_sniffer.channel);
+  //pLink->verbose(dbg);
 
   /* Remove timer. */
   g_sniffer.ticker.detach();
@@ -1810,8 +1809,8 @@ static void sync_hop_channel(void)
   g_sniffer.conn_evt_pkt_counter = 0;
 
   /* Do we need to update connection parameters ? */
-  snprintf((char *)hexbuf, 20, "evtctr: %d", g_sniffer.conn_evt_counter);
-  pLink->verbose(hexbuf);
+  //snprintf((char *)hexbuf, 20, "evtctr: %d", g_sniffer.conn_evt_counter);
+  //pLink->verbose(hexbuf);
 
   if (g_sniffer.expect_cp_update && (g_sniffer.cp_update_instant <= g_sniffer.conn_evt_counter))
   {
@@ -1880,12 +1879,6 @@ static void sync_hop_channel(void)
 
 static void set_timer_for_next_anchor(uint32_t interval)
 {
-  uint8_t dbg[128];
-  snprintf((char *)dbg, 128, "set_timer_for_next_anchor() %d (%d)", g_sniffer.channel, interval);
-  pLink->verbose(dbg);
-  snprintf((char *)dbg, 128, "Timer instance: 0x%08x", CustomTimer::m_timer);
-  pLink->verbose(dbg);
-
   g_sniffer.ticker.detach();
   g_sniffer.hj_ticker.detach();
 

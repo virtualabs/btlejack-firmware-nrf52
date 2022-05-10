@@ -28,7 +28,12 @@ void CustomTimer::attach_us(FCallback pfn_callback, uint32_t period)
   CustomTimer::m_callbacks[m_channel] = pfn_callback;
 
   /* Save period. */
-  CustomTimer::m_timer->offsetCompare(m_channel, m_periods[m_channel]);
+  CustomTimer::m_timer->setCompare(m_channel, CustomTimer::m_timer->captureCounter() + m_periods[m_channel]);
+}
+
+int CustomTimer::get_channel(void)
+{
+  return m_channel;
 }
 
 void CustomTimer::detach(void)
