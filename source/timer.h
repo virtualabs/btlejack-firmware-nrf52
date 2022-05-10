@@ -21,7 +21,6 @@ class CustomTimer {
   private:
     
     static int m_current_channel;
-    static NRFLowLevelTimer *m_timer;
     static FCallback m_callbacks[NB_CHANNELS_MAX];
     static uint32_t m_periods[NB_CHANNELS_MAX];
 
@@ -30,6 +29,7 @@ class CustomTimer {
     int m_channel;
 
   public:
+      static NRFLowLevelTimer *m_timer;
       CustomTimer();
       void attach_us(FCallback pfn_callback, uint32_t period);
       void detach(void);

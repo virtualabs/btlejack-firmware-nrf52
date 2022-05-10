@@ -250,7 +250,7 @@ void hop_tick()
 void next_adv_channel(void)
 {
   g_sniffer.ticker.detach();
-  //pLink->verbose(B("*"));
+  pLink->verbose(B("*"));
 
   if ((g_sniffer.channel >= 37) && (g_sniffer.channel <39))
   {
@@ -1882,6 +1882,8 @@ static void set_timer_for_next_anchor(uint32_t interval)
 {
   uint8_t dbg[128];
   snprintf((char *)dbg, 128, "set_timer_for_next_anchor() %d (%d)", g_sniffer.channel, interval);
+  pLink->verbose(dbg);
+  snprintf((char *)dbg, 128, "Timer instance: 0x%08x", CustomTimer::m_timer);
   pLink->verbose(dbg);
 
   g_sniffer.ticker.detach();
