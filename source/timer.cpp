@@ -1,4 +1,5 @@
 #include "timer.h"
+#include "link.h"
 
 CustomTimer::CustomTimer() {
   /* Instanciate NRFLowLevelTimer if required. */
@@ -37,6 +38,7 @@ void CustomTimer::detach(void)
 
 void CustomTimer::timer_callback(uint16_t channel_bitmsk)
 {
+  CustomTimer::m_timer->disableIRQ();
   for (int i=0; i<NB_CHANNELS_MAX; i++)
   {
     if (channel_bitmsk & (1<<i))
@@ -49,7 +51,7 @@ void CustomTimer::timer_callback(uint16_t channel_bitmsk)
       CustomTimer::m_timer->offsetCompare(i, m_periods[i]);
     }
   }
-
+  CustomTimer::m_timer->enableIRQ();
 }
 
 NRFLowLevelTimer *CustomTimer::m_timer = NULL;

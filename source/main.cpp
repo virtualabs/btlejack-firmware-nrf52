@@ -320,6 +320,7 @@ void hj_sync()
 
 static void next_channel_tick()
 {
+  pLink->verbose(B("next_channel_tick()"));
   /* TODO: maybe use the same code as sync_hop_channel, I mean listen on a channel
   a bit earlier and wait for master's packet to synchronize rather than relying
   on microbit's timers... */
