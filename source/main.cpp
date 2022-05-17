@@ -179,7 +179,7 @@ uint8_t tx_buffer[254];                     /* Tx buffer used by RF to send pack
 /* Packet injection buffer. */
 uint8_t packet[254];
 
-#if 0
+
 static void recover_crc(uint32_t access_address);
 static void recover_hop_interval(void);
 static void recover_chm();
@@ -187,7 +187,6 @@ static void recover_chm_next();
 static void recover_cchm_next();
 static void recover_cchm_next_v5();
 static void recover_hop_inc(void);
-#endif 
 
 static void follow_connection(void);
 static void sync_connection(void);
@@ -237,6 +236,9 @@ uint8_t count_channels()
 void hop_tick()
 {
     measures++;
+
+    /* Rearm timer. */
+    g_sniffer.ticker.rearm();
 }
 
 
@@ -423,6 +425,7 @@ static void start_hijack()
   g_sniffer.hj_timer = timer_create(TIMER_REPEATED);
   timer_start(g_sniffer.hj_timer, g_sniffer.hop_interval*1250, hijack_hop_channel);
 }
+#endif
 
 int seen_aa(uint32_t aa)
 {
@@ -484,7 +487,6 @@ int seen_aa(uint32_t aa)
         return 1;
     }
 }
-#endif
 
 
 /**
@@ -511,7 +513,6 @@ extern "C" void RADIO_IRQHandler(void)
 
         switch(g_sniffer.action)
         {
-#if 0
           case SNIFF_AA:
             {
               g_sniffer.pkt_count++;
@@ -593,14 +594,6 @@ extern "C" void RADIO_IRQHandler(void)
                             g_sniffer.access_address,
                             g_sniffer.crcinit
                           );
-#if 0
-                          if (!g_sniffer.chm_provided)
-                            recover_chm();
-                          else if (!g_sniffer.interval_provided)
-                            recover_hop_interval();
-                          else
-                            recover_hop_inc();
-#endif
                       }
                       else
                       {
@@ -757,6 +750,7 @@ extern "C" void RADIO_IRQHandler(void)
                   }
                   else if (g_sniffer.channel == g_sniffer.sg->getFirstChannel())
                   {
+                    pLink->verbose(B("[hopinc] First packet received"));
                       /* First packet receive. */
                       g_sniffer.observed_interval = measures;
 
@@ -765,6 +759,7 @@ extern "C" void RADIO_IRQHandler(void)
                       radio_follow_aa(g_sniffer.access_address, g_sniffer.channel, g_sniffer.crcinit);
                   } else if (g_sniffer.channel == g_sniffer.sg->getSecondChannel())
                   {
+                      pLink->verbose(B("[hopinc] Second packet received"));
                       /* Second packet received, deduce hop increment. */
                       inter = DIVIDE_ROUND((measures - g_sniffer.observed_interval), g_sniffer.hop_interval);
                       g_sniffer.hop_increment = g_sniffer.sg->getHopIncrement(inter);
@@ -784,7 +779,7 @@ extern "C" void RADIO_IRQHandler(void)
                       {
                         /* Restart measure. */
                         g_sniffer.measuring = false;
-                        g_sniffer.ticker.detach();
+                        //g_sniffer.ticker.detach();
                       }
                   }
               }
@@ -793,7 +788,7 @@ extern "C" void RADIO_IRQHandler(void)
               NRF_RADIO->TASKS_START = 1;
             }
             break;
-#endif 
+
           case SNIFF_CONNECT_REQ:
             {
               /* Sniff connection request for a given BD address */
@@ -1073,7 +1068,7 @@ extern "C" void RADIO_IRQHandler(void)
               NRF_RADIO->TASKS_START = 1;
             }
             break;
-#if 0
+
           case PRNG_INIT:
             {
               /* CRC must be correct. */
@@ -1188,6 +1183,7 @@ extern "C" void RADIO_IRQHandler(void)
             }
             break;
 
+#if 0
           /* JAM_TX packet sent, reconfigure RADIO to listen. */
           case JAM_TX:
             {
@@ -1355,7 +1351,7 @@ static void reset(void)
 
   /* Reset timers. */
   g_sniffer.ticker.detach();
-  g_sniffer.hj_ticker.detach();
+  //g_sniffer.hj_ticker.detach();
 
   /*
   if (g_sniffer.hj_timer >= 0)
@@ -1379,7 +1375,6 @@ static void reset(void)
   g_sniffer.follow_advert = false;
 }
 
-#if 0
 static void start_scanning(void)
 {
     /* Sniffer is idling. */
@@ -1511,7 +1506,6 @@ static void recover_prng_state_v5(uint32_t accessAddress, uint32_t crcInit, uint
     g_sniffer.crcinit
   );
 }
-#endif
 
 /**
  * Configure radio to sniff CONNECT_REQ packets on an advertising channel.
@@ -1603,7 +1597,7 @@ static void sync_lost_track(void)
 {
   int i;
   uint32_t remaining;
-  char msg[30];
+  uint8_t msg[128];
 
   /* TODO: switch chm based on instant rather than errors, this should be
            reserved to passive sniffing !                                 */
@@ -1672,6 +1666,7 @@ static void sync_lost_track(void)
   /* Is there a channel map update to apply ? */
   if ((g_sniffer.action == SYNC_CONNECT) && (g_sniffer.expect_chm_update))
   {
+    //pLink->verbose(B("sync_connect, chm update"));
     g_sniffer.ticker.detach();
 
     /* Copy new channel map to current channel map. */
@@ -1736,7 +1731,9 @@ static void sync_lost_track(void)
 
   else {
     if (g_sniffer.csa != CSA_BLE5)
+    {
       sync_hop_channel();
+    }
     else
     {
       //g_sniffer.sg->getNextChannel();
@@ -1785,14 +1782,14 @@ static void sync_lost_track(void)
 
 static void sync_hop_channel(void)
 {
-  uint8_t hexbuf[20];
+  uint8_t hexbuf[128];
   uint8_t dbg[128];
   
   //snprintf((char *)dbg, 128, "sync_hop_channel() %d", g_sniffer.channel);
   //pLink->verbose(dbg);
 
   /* Remove timer. */
-  g_sniffer.ticker.detach();
+  //g_sniffer.ticker.detach();
 
   /* Need to synchronize again. */
   g_sniffer.synced = false;
@@ -1808,14 +1805,8 @@ static void sync_hop_channel(void)
     g_sniffer.conn_evt_counter = g_sniffer.sg->getFirstChannel();
   g_sniffer.conn_evt_pkt_counter = 0;
 
-  /* Do we need to update connection parameters ? */
-  //snprintf((char *)hexbuf, 20, "evtctr: %d", g_sniffer.conn_evt_counter);
-  //pLink->verbose(hexbuf);
-
   if (g_sniffer.expect_cp_update && (g_sniffer.cp_update_instant <= g_sniffer.conn_evt_counter))
   {
-
-
       /* resync our connection event counter with current counter (only for CSA#2) */
       if (g_sniffer.csa == CSA_BLE5)
         g_sniffer.conn_evt_counter = g_sniffer.sg->getFirstChannel();
@@ -1879,8 +1870,8 @@ static void sync_hop_channel(void)
 
 static void set_timer_for_next_anchor(uint32_t interval)
 {
-  g_sniffer.ticker.detach();
-  g_sniffer.hj_ticker.detach();
+  //g_sniffer.ticker.detach();
+  //g_sniffer.hj_ticker.detach();
 
   g_sniffer.conn_lost_packets = 0;
 
@@ -1891,8 +1882,8 @@ static void set_timer_for_next_anchor(uint32_t interval)
     interval
   );
 
-  hops = 0;
-  g_sniffer.hj_ticker.attach_us(hj_sync, 1250);
+  //hops = 0;
+  //g_sniffer.hj_ticker.attach_us(hj_sync, 1250);
 }
 
 #if 0
@@ -1973,7 +1964,6 @@ static void hijack_hop_channel(void)
 }
 #endif
 
-#if 0
 static void chm_tick()
 {
     if (g_sniffer.channel < 36)
@@ -2031,8 +2021,8 @@ static void cchm_tick(void)
 
     /* Tune to next channel. */
     g_sniffer.channel++;
-    snprintf((char *)&msg, 5, "c=%d", g_sniffer.channel);
-    pLink->verbose(msg);
+    //snprintf((char *)&msg, 5, "c=%d", g_sniffer.channel);
+    //pLink->verbose(msg);
     radio_follow_aa(g_sniffer.access_address, g_sniffer.channel, g_sniffer.crcinit);
   }
   pLink->verbose(B("_"));
@@ -2259,12 +2249,11 @@ static void recover_hop_inc(void)
     g_sniffer.channel = g_sniffer.sg->getFirstChannel();
     radio_follow_aa(g_sniffer.access_address, g_sniffer.channel, g_sniffer.crcinit);
 }
-#endif 
 
 static void follow_connection(void)
 {
     /* Stop any timer. */
-    g_sniffer.ticker.detach();
+    //g_sniffer.ticker.detach();
 
     /**
      * Max lost packets allowed is very low here, to easily detect bad channel
@@ -2325,6 +2314,7 @@ static void send_packet(uint8_t *pPacket, int size)
     pLink->verbose(B("PS"));
   }
 }
+#endif
 
 /**
  * Start Collaborative Channel Mapping.
@@ -2398,7 +2388,6 @@ void start_cchm_v5(uint32_t accessAddress, uint32_t crcInit)
   g_sniffer.ticker.attach_us(cchm_tick_v5,/*(unsigned int)g_sniffer.max_interval * 1250*/g_sniffer.cchm_timeout * 1000);
 
 }
-#endif
 
 void dispatchMessage(T_OPERATION op, uint8_t *payload, int nSize, uint8_t ubflags)
 {
@@ -2456,7 +2445,7 @@ void dispatchMessage(T_OPERATION op, uint8_t *payload, int nSize, uint8_t ubflag
           pLink->sendPacket(LIST_AA, NULL, 0, PKT_COMMAND | PKT_RESPONSE);
 
           /* Start scanning. */
-          //start_scanning();
+          start_scanning();
 
         }
         else
@@ -2507,7 +2496,7 @@ void dispatchMessage(T_OPERATION op, uint8_t *payload, int nSize, uint8_t ubflag
                   pLink->sendPacket(RECOVER, NULL, 0, PKT_COMMAND | PKT_RESPONSE);
 
                   /* Recover parameters. */
-                  //recover_crcinit(accessAddress);
+                  recover_crcinit(accessAddress);
                 }
               }
               break;
@@ -2550,7 +2539,7 @@ void dispatchMessage(T_OPERATION op, uint8_t *payload, int nSize, uint8_t ubflag
                     }
 
                     /* Enable CCHM mode. */
-                    //start_cchm(accessAddress, crcInit);
+                    start_cchm(accessAddress, crcInit);
 
                     /* Send ACK. */
                     pLink->sendPacket(RECOVER, NULL, 0, PKT_COMMAND | PKT_RESPONSE);
@@ -2574,7 +2563,7 @@ void dispatchMessage(T_OPERATION op, uint8_t *payload, int nSize, uint8_t ubflag
                       chm[i] = payload[8+i];
 
                     /* Recover hop interval, then hop increment and follow. */
-                    //recover_hop(accessAddress, crcInit, chm);
+                    recover_hop(accessAddress, crcInit, chm);
 
                     /* Send ACK. */
                     pLink->sendPacket(RECOVER, NULL, 0, PKT_COMMAND | PKT_RESPONSE);
@@ -2623,7 +2612,7 @@ void dispatchMessage(T_OPERATION op, uint8_t *payload, int nSize, uint8_t ubflag
                     }
 
                     /* Enable CCHM v5 mode. */
-                    //start_cchm_v5(accessAddress, crcInit);
+                    start_cchm_v5(accessAddress, crcInit);
 
                     /* Send ACK. */
                     pLink->sendPacket(RECOVER, NULL, 0, PKT_COMMAND | PKT_RESPONSE);
@@ -2656,7 +2645,7 @@ void dispatchMessage(T_OPERATION op, uint8_t *payload, int nSize, uint8_t ubflag
                     g_sniffer.csa = CSA_BLE5;
 
                     /* Enable PRNG state recovery v5 mode. */
-                    //recover_prng_state_v5(accessAddress, crcInit, chm, hopInterval);
+                    recover_prng_state_v5(accessAddress, crcInit, chm, hopInterval);
 
                   }
               }
